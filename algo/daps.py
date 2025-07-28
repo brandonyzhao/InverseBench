@@ -55,7 +55,7 @@ class LangevinDynamics:
         x0hat = x0hat.detach()
         x = x0hat.clone().detach().requires_grad_(True)
         optimizer = torch.optim.SGD([x], lr)
-        for _ in pbar:
+        for iter in pbar:
             optimizer.zero_grad()
 
             gradient = operator.gradient(x, measurement) / (2 * self.tau ** 2)
@@ -69,6 +69,8 @@ class LangevinDynamics:
 
             # early stopping with NaN
             if torch.isnan(x).any():
+                print('Nan detected!', iter)
+                pdb.set_trace()
                 return torch.zeros_like(x)
 
         return x.detach()
@@ -123,9 +125,10 @@ class DAPS(Algo):
             Returns:
                 torch.Tensor: The final sampled state.
         """
-        # pdb.set_trace()
-        # if num_samples > 1:
-            # observation = observation.repeat(num_samples, 1, 1, 1)
+        
+        if num_samples > 1:
+            num_repeats = num_samples // 20
+            observation = observation.repeat(num_repeats, 1, 1, 1)
         device = self.forward_op.device
         pbar = tqdm.trange(self.annealing_scheduler.num_steps) if verbose else range(self.annealing_scheduler.num_steps)
         xt = torch.randn(num_samples, self.net.img_channels, self.net.img_resolution, self.net.img_resolution, device=device) * self.annealing_scheduler.sigma_max
@@ -134,6 +137,7 @@ class DAPS(Algo):
             # 1. reverse diffusion
             diffusion_scheduler = Scheduler(**self.diffusion_scheduler_config, sigma_max=sigma)
             sampler = DiffusionSampler(diffusion_scheduler)
+
             x0hat = sampler.sample(self.net, xt, SDE=False, verbose=False, **kwargs)
             # pdb.set_trace()
             # 2. langevin dynamics
@@ -141,6 +145,9 @@ class DAPS(Algo):
 
             # 3. forward diffusion
             xt = x0y + torch.randn_like(x0y) * self.annealing_scheduler.sigma_steps[step + 1]
+            # pdb.set_trace()
+            meas_loss = self.forward_op.loss(xt, observation)
+            pbar.set_description(f'Loss: {meas_loss.cpu().item(): .2f}')
 
         return xt
 

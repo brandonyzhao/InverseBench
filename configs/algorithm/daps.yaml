@@ -3,7 +3,7 @@ method:
   _target_: algo.daps.DAPS
   annealing_scheduler_config:
     num_steps: 200
-    sigma_max: 100
+    sigma_max: 10
     sigma_min: 0.1
     sigma_final: 0
     schedule: 'linear'
@@ -19,5 +19,5 @@ method:
   lgvd_config:
     num_steps: 100
     lr: 1e-4
-    tau: 1e-3 #0.01 #smaller = more likelihood
+    tau: 0.001 #0.01 #smaller = more likelihood
     lr_min_ratio: 0.01

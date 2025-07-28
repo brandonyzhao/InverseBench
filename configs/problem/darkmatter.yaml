@@ -1,5 +1,5 @@
 name: darkmatter
-prior: exps/pretrain/test/ckpts/ckpt_45000.pt
+prior: exps/pretrain/test/ckpts/ckpt_95000.pt
 model:
   _target_: inverse_problems.darkmatter.DarkMatterImaging
   gamma: 1.0
@@ -25,4 +25,4 @@ evaluator:
   _target_: eval.DarkMatterEvaluator
 
 
-exp_dir: exps/inference/darkmatter_shear_noproj_lerp
+exp_dir: exps/inference/darkmatter_shear_3d_test

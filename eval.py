@@ -10,6 +10,7 @@ from piq import LPIPS, psnr, ssim
 from collections import defaultdict
 from training.loss import DynamicRangePSNRLoss, DynamicRangeSSIMLoss
 
+import pdb
 
 class Evaluator(ABC):
     def __init__(self, 
@@ -73,7 +74,7 @@ class DarkMatterEvaluator(Evaluator):
     def __call__(self, pred, target, observation=None):
         metric_dict = {}
         pred, target, observation = pred.to(self.device), target.to(self.device), observation.to(self.device)
-
+        # pdb.set_trace()
         # evaluation
         metric_dict['chi2'] = self.forward_op.evaluate_chisq(pred, observation) 
         metric_dict['mse'] = self.forward_op.evaluate_mse(target, pred) 

@@ -97,9 +97,8 @@ def main(config):
             logger.info(f'Running inference on test sample {data_id}...')
             # TODO: If dark matter get class labels
             if config.problem.name == 'darkmatter': 
-                # class_labels = forward_op.class_labels.repeat(config.num_samples, 1)
-                class_laels = forward_op.class_labels
-                recon = algo.inference(observation, num_samples=config.num_samples, class_labels=class_labels)
+                class_labels = forward_op.class_labels.repeat(config.num_samples, 1)
+                recon = algo.inference(observation, num_samples=config.num_samples*20, class_labels=class_labels)
             else:
                 recon = algo.inference(observation, num_samples=config.num_samples)
             logger.info(f'Peak GPU memory usage: {torch.cuda.max_memory_allocated() / 1024 ** 3:.2f} GB')

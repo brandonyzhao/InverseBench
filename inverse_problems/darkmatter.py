@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import string
+from typing import Dict
 import pdb
 
 def tukey_lowpass(F, edge_frac=0.1):
@@ -123,6 +124,8 @@ def lerp_planes_to_lightcone(dm_cube, r, dx, coords, device):
 
     return patch
 
+lerp_planes_to_lightcone_v = torch.vmap(lerp_planes_to_lightcone, in_dims=(0, None, None, None, None), out_dims=0)
+
 def ks93inv(kE, kB, device):
     # Check consistency of input maps
     assert kE.shape == kB.shape
@@ -181,23 +184,36 @@ class DarkMatterImaging(BaseOperator):
         self.do_proj = do_proj
         self.pad_mat = F.pad(torch.ones((120, 120)), (4,4,4,4), 'constant', 0).unsqueeze(0).to(device)
 
+        self.grad_scale = (self.r / self.r.max())**2
+
         self.class_labels = torch.eye(self.eta_shape[0]).to(device) # class label matrix for sampling cubes
 
+    def __call__(self, 
+                 inputs: Dict,
+                 **kwargs):
+
+        target = inputs['target']
+        # calculate A(x)
+        out = self.forward(target, **kwargs)
+        # add noise
+        return out # + self.sigma_noise * torch.randn_like(out)
+
     def forward(self, x, **kwargs):
-        x = self.unnormalize(x).reshape(self.eta_shape)
+        x = self.unnormalize(x).reshape((-1,) + self.eta_shape)
         # Try padding 
         # x = x * self.pad_mat
         # pdb.set_trace()
-        lightcone_out = lerp_planes_to_lightcone(x, self.r, self.dx, self.coords, self.device)
-        k = lightcone_out[:, 0]
-        e1 = lightcone_out[:, 1]
-        e2 = lightcone_out[:, 2]
+        lightcone_out = lerp_planes_to_lightcone_v(x, self.r, self.dx, self.coords, self.device)
+        # pdb.set_trace()
+        # k = lightcone_out[:, 0]
+        # e1 = lightcone_out[:, 1]
+        # e2 = lightcone_out[:, 2]
     
-        output = lightcone_out[1:, 1:]
-
+        output = lightcone_out[:, :, 0]
+        # pdb.set_trace()
         # if self.do_proj:
         #     output =  weighted_proj_map(output, self.pws)
-        return output#.reshape(20, -1)
+        return output# .flatten(start_dim=1, end_dim=2)
     
     def ferp_lightcone(self, x): 
         x = self.unnormalize(x)
@@ -206,43 +222,41 @@ class DarkMatterImaging(BaseOperator):
         return k
     
     def lerp_lightcone(self, x): 
-        x = self.unnormalize(x)
-        x = x.reshape(self.eta_shape)
-        grid = lerp_planes_to_lightcone(x, self.r, self.dx, self.coords, self.device)
-        return grid[:, 0]
+        x = self.unnormalize(x).reshape((-1,) + self.eta_shape)
+        grid = lerp_planes_to_lightcone_v(x, self.r, self.dx, self.coords, self.device)
+        return grid[:, :, 0]
     
     @staticmethod
     def mean_subtract(x): 
-        return x - torch.mean(x, dim=(1,2), keepdim=True)
+        return x - torch.mean(x, dim=(2,3), keepdim=True)
     
     def loss(self, pred, observation, **kwargs): 
-        # MSE Loss
-        # pred = self.mean_subtract(pred.reshape(self.eta_shape))
-        # observation = self.mean_subtract(observation.reshape(self.eta_shape))
-        return torch.mean(torch.square(self.forward(pred) - observation)) 
+        # Chi-sq Loss
+        # pdb.set_trace()
+        return torch.mean(torch.square(self.forward(pred) - observation)) / (self.grad_scale.view(1, -1, 1, 1))
 
     def loss_m(self, measurements, observation): 
         # Chi-sq observation loss 
-        return torch.mean(torch.square(measurements - observation))
+        return torch.mean(torch.square(measurements - observation)) # / (self.sigma_noise**2)
     
     def evaluate_chisq(self, pred, observation): 
-        return (torch.mean(torch.square(self.forward(pred) - observation)) / self.sigma_noise).cpu().item()
+        return (torch.mean(torch.square(self.forward(pred) - observation)) / (self.sigma_noise**2)).cpu().item()
     
     def evaluate_mse(self, target, pred): 
-        target = target.reshape(self.eta_shape)
-        pred = pred.reshape(self.eta_shape)
+        # target = target.reshape(self.eta_shape)
+        pred = pred.reshape((-1,) + self.eta_shape)
         return torch.mean(torch.square(self.mean_subtract(target) - self.mean_subtract(pred))).cpu().item()
     
     def evaluate_psnr(self, target, pred, max_val=1.0): 
-        target = target.reshape(self.eta_shape)
-        pred = pred.reshape(self.eta_shape)
+        # target = target.reshape(self.eta_shape)
+        pred = pred.reshape((-1,) + self.eta_shape)
         mse = torch.mean(torch.square(self.mean_subtract(target) - self.mean_subtract(pred)))
         psnr = 10 * torch.log10(max_val**2 / (mse + 1e-8))  # epsilon to avoid log(0)
         return psnr.cpu().item()
     
     def evaluate_pcc(self, target, pred): 
-        target = target.reshape(self.eta_shape)
-        pred = pred.reshape(self.eta_shape)
+        # target = target.reshape(self.eta_shape)
+        pred = pred.reshape((-1,) + self.eta_shape)
 
         target = self.mean_subtract(target)
         pred = self.mean_subtract(pred)

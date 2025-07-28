@@ -95,14 +95,23 @@ def main(config):
             target = data['target']
             # run the algorithm
             logger.info(f'Running inference on test sample {data_id}...')
-            recon = algo.inference(observation, num_samples=config.num_samples)
+            # TODO: If dark matter get class labels
+            if config.problem.name == 'darkmatter': 
+                # class_labels = forward_op.class_labels.repeat(config.num_samples, 1)
+                class_laels = forward_op.class_labels
+                recon = algo.inference(observation, num_samples=config.num_samples, class_labels=class_labels)
+            else:
+                recon = algo.inference(observation, num_samples=config.num_samples)
             logger.info(f'Peak GPU memory usage: {torch.cuda.max_memory_allocated() / 1024 ** 3:.2f} GB')
 
             result_dict = {
                 'observation': observation,
                 'recon': forward_op.unnormalize(recon).cpu(),
                 'target': forward_op.unnormalize(target).cpu(),
+                'recon_lightcone': forward_op.lerp_lightcone(recon).cpu(),
+                'target_lightcone': forward_op.lerp_lightcone(target).cpu()
             }
+
             torch.save(result_dict, save_path)
             logger.info(f"Saved results to {save_path}.")
         else:

@@ -1,0 +1,28 @@
+name: darkmatter
+prior: exps/pretrain/test/ckpts/ckpt_45000.pt
+model:
+  _target_: inverse_problems.darkmatter.DarkMatterImaging
+  gamma: 1.0
+  num_iters: 200
+  pws: '/srv/tmp/brandon/JaxPM_shear/pm_fields/pws0.npy'
+  lightcone_specs: '/srv/tmp/brandon/PnP-DM-public/data/lightcone_specs.pt'
+  coords: '/srv/tmp/brandon/JaxPM_shear/pm_fields/coords.npy'
+  do_proj: False
+  eta_shape: [20, 128, 128]
+  sigma_noise: 0.001
+  unnorm_scale: 10.
+  unnorm_shift: 0.0
+ 
+
+data:
+  _target_: training.dataset.DarkMatterZCondTest
+  root: /srv/tmp/brandon/pm_dataset_planes_3
+  normalize: True
+  id_list: 0-4
+
+
+evaluator:
+  _target_: eval.DarkMatterEvaluator
+
+
+exp_dir: exps/inference/darkmatter_shear_noproj_lerp

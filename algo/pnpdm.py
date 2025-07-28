@@ -105,7 +105,7 @@ class PnPDM(Algo):
         self.diffusion_scheduler_config = diffusion_scheduler_config
         self.lgvd = LangevinDynamics(**lgvd_config)
 
-    def inference(self, observation, num_samples=1, verbose=True):
+    def inference(self, observation, num_samples=1, verbose=True, **kwargs):
         device = self.forward_op.device
         num_steps = len(self.annealing_sigmas)
         pbar = tqdm.trange(num_steps) if verbose else range(num_steps)
@@ -121,7 +121,7 @@ class PnPDM(Algo):
             # 2. reverse diffusion
             diffusion_scheduler = Scheduler.get_partial_scheduler(self.base_diffusion_scheduler, sigma)
             sampler = DiffusionSampler(diffusion_scheduler)
-            x = sampler.sample(self.net, z, SDE=True, verbose=False)
+            x = sampler.sample(self.net, z, SDE=True, verbose=False, **kwargs)
 
             loss = self.forward_op.loss(x, observation)
             pbar.set_description(f'Iteration {step + 1}/{num_steps}. Avg. Error: {loss.sqrt().mean().cpu().item()}')

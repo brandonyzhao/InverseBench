@@ -20,7 +20,7 @@ class DiffusionSampler:
         self.scheduler = scheduler
         self.solver = solver
 
-    def sample(self, model, x_start, SDE=False, verbose=False):
+    def sample(self, model, x_start, SDE=False, verbose=False, **kwargs):
         """
             Samples from the diffusion process using the specified model.
 
@@ -35,11 +35,11 @@ class DiffusionSampler:
                 torch.Tensor: The final sampled state.
         """
         if self.solver == 'euler':
-            return self._euler(model, x_start, SDE, verbose)
+            return self._euler(model, x_start, SDE, verbose, **kwargs)
         else:
             raise NotImplementedError
 
-    def score(self, model, x, sigma):
+    def score(self, model, x, sigma, **kwargs):
         """
             Computes the score function for the given model.
 
@@ -52,10 +52,10 @@ class DiffusionSampler:
                 torch.Tensor: The computed score.
         """
         sigma = torch.as_tensor(sigma).to(x.device)
-        d = model(x, sigma)
+        d = model(x, sigma, **kwargs)
         return (d - x) / sigma**2
     
-    def _euler(self, model, x_start, SDE=False, verbose=False):
+    def _euler(self, model, x_start, SDE=False, verbose=False, **kwargs):
         """
             Euler's method for sampling from the diffusion process.
         """
@@ -64,7 +64,7 @@ class DiffusionSampler:
         x = x_start
         for step in pbar:
             sigma, factor, scaling_factor = self.scheduler.sigma_steps[step], self.scheduler.factor_steps[step], self.scheduler.scaling_factor[step]
-            score = self.score(model, x / self.scheduler.scaling_steps[step], sigma) / self.scheduler.scaling_steps[step]
+            score = self.score(model, x / self.scheduler.scaling_steps[step], sigma, **kwargs) / self.scheduler.scaling_steps[step]
             if SDE:
                 epsilon = torch.randn_like(x)
                 x = x * scaling_factor + factor * score + np.sqrt(factor) * epsilon

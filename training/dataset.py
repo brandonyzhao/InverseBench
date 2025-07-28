@@ -218,6 +218,66 @@ class BlackHole(Dataset):
             img = torch.flip(img, [1])  # top-down flip
         return {'target': img}
 
+class DarkMatterZCond(Dataset):
+
+    def __init__(self, root, normalize=True):
+        super().__init__()
+        self.data_paths = [root + '/pm_%04d.npy'%i for i in range(2500)]
+        self.normalize = normalize 
+        self.num_planes = np.load(self.data_paths[0]).shape[0]
+
+    def open_lmdb(self):
+        self.env = lmdb.open(self.root, readonly=True, lock=False, create=False)
+        self.txn = self.env.begin(write=False)
+
+    def normalize_fn(self, img): 
+        return img / 10
+    def __len__(self):
+        return len(self.data_paths) * self.num_planes
+    
+    def __getitem__(self, idx):
+        idx_cube = idx // self.num_planes 
+        idx_plane = idx % self.num_planes
+        if self.normalize: 
+            data = self.normalize_fn(torch.tensor(np.load(self.data_paths[idx_cube])[idx_plane][None, ...]))
+        else: 
+            data = torch.tensor(np.load(self.data_paths[idx_cube])[idx_plane][None, ...])
+        label = torch.tensor(idx_plane).long()
+        return data.float(), torch.nn.functional.one_hot(label, num_classes=self.num_planes)
+    
+class DarkMatterZCondTest(Dataset):
+
+    def __init__(self, root, normalize=True, id_list=None):
+        super().__init__()
+        self.data_paths = [root + '/pm_%04d.npy'%i for i in range(5)]
+        self.normalize = normalize 
+        self.num_planes = np.load(self.data_paths[0]).shape[0]
+
+        if id_list is None:
+            self.length = len(self.data)
+            self.idx_map = lambda x: x
+            self.id_list = list(range(self.length))
+        else:
+            id_list = parse_int_list(id_list)
+            self.length = len(id_list)
+            self.idx_map = lambda x: id_list[x]
+            self.id_list = id_list
+
+    def open_lmdb(self):
+        self.env = lmdb.open(self.root, readonly=True, lock=False, create=False)
+        self.txn = self.env.begin(write=False)
+
+    def normalize_fn(self, img): 
+        return img / 10
+    def __len__(self):
+        return len(self.data_paths)
+    
+    def __getitem__(self, idx):
+        target = torch.tensor(np.load(self.data_paths[idx])).float()
+        if self.normalize: 
+            target = self.normalize_fn(target)
+
+        return {'target': target}
 
 class ImageDataset(Dataset):
     """

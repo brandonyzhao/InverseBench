@@ -5,6 +5,8 @@ import numpy as np
 from utils.scheduler import Scheduler
 from utils.diffusion import DiffusionSampler
 
+import pdb
+
 # ------------------------------------------------------------------------------------
 # Paper: Improving diffusion inverse problem solving with decoupled noise annealing
 # Official implementation: https://github.com/zhangbingliang2019/DAPS
@@ -105,7 +107,7 @@ class DAPS(Algo):
         self.lgvd = LangevinDynamics(**lgvd_config)
 
     
-    def inference(self, observation, num_samples=1, verbose=True):
+    def inference(self, observation, num_samples=1, verbose=True, **kwargs):
         """
             Samples using the DAPS method.
 
@@ -121,8 +123,9 @@ class DAPS(Algo):
             Returns:
                 torch.Tensor: The final sampled state.
         """
-        if num_samples > 1:
-            observation = observation.repeat(num_samples, 1, 1, 1)
+        # pdb.set_trace()
+        # if num_samples > 1:
+            # observation = observation.repeat(num_samples, 1, 1, 1)
         device = self.forward_op.device
         pbar = tqdm.trange(self.annealing_scheduler.num_steps) if verbose else range(self.annealing_scheduler.num_steps)
         xt = torch.randn(num_samples, self.net.img_channels, self.net.img_resolution, self.net.img_resolution, device=device) * self.annealing_scheduler.sigma_max
@@ -131,8 +134,8 @@ class DAPS(Algo):
             # 1. reverse diffusion
             diffusion_scheduler = Scheduler(**self.diffusion_scheduler_config, sigma_max=sigma)
             sampler = DiffusionSampler(diffusion_scheduler)
-            x0hat = sampler.sample(self.net, xt, SDE=False, verbose=False)
-
+            x0hat = sampler.sample(self.net, xt, SDE=False, verbose=False, **kwargs)
+            # pdb.set_trace()
             # 2. langevin dynamics
             x0y = self.lgvd.sample(x0hat, self.forward_op, observation, sigma, step / self.annealing_scheduler.num_steps)
 

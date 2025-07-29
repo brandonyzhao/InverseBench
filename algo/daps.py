@@ -55,13 +55,16 @@ class LangevinDynamics:
         x0hat = x0hat.detach()
         x = x0hat.clone().detach().requires_grad_(True)
         optimizer = torch.optim.SGD([x], lr)
-        for _ in pbar:
+        for i in pbar:
             optimizer.zero_grad()
 
-            gradient = operator.gradient(x, measurement) / (2 * self.tau ** 2)
-            gradient += (x - x0hat) / sigma ** 2
+            gradient1 = operator.gradient(x, measurement) / (2 * self.tau ** 2)
+            gradient2 = (x - x0hat) / sigma ** 2
+            gradient = gradient1 + gradient2
             x.grad = gradient
-
+            # x.grad = torch.clip(gradient, min=-1e4, max=1e4)
+            # torch.save(gradient1, './debug_grad/gradient1_%03d.pt'%i)
+            # torch.save(gradient2, './debug_grad/gradient2_%03d.pt'%i)
             optimizer.step()
             with torch.no_grad():
                 epsilon = torch.randn_like(x)
@@ -69,6 +72,8 @@ class LangevinDynamics:
 
             # early stopping with NaN
             if torch.isnan(x).any():
+                print('nan detected!', i)
+                pdb.set_trace()
                 return torch.zeros_like(x)
 
         return x.detach()

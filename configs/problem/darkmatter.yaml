@@ -12,6 +12,7 @@ model:
   sigma_noise: 0.001
   unnorm_scale: 10.
   unnorm_shift: 0.0
+  noise_type: no_noise
  
 
 data:
@@ -25,4 +26,4 @@ evaluator:
   _target_: eval.DarkMatterEvaluator
 
 
-exp_dir: exps/inference/darkmatter_shear_noproj_lerp
+exp_dir: exps/inference/darkmatter_shear_noproj_lerp_test_debug

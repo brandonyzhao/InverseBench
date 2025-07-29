@@ -98,7 +98,7 @@ def main(config):
             # TODO: If dark matter get class labels
             if config.problem.name == 'darkmatter': 
                 # class_labels = forward_op.class_labels.repeat(config.num_samples, 1)
-                class_laels = forward_op.class_labels
+                class_labels = forward_op.class_labels
                 recon = algo.inference(observation, num_samples=config.num_samples, class_labels=class_labels)
             else:
                 recon = algo.inference(observation, num_samples=config.num_samples)

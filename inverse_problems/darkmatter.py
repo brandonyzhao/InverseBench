@@ -167,7 +167,7 @@ class DarkMatterImaging(BaseOperator):
     '''
 
     def __init__(self, gamma, num_iters, pws, eta_shape, lightcone_specs, coords, do_proj, 
-                 sigma_noise, unnorm_shift, unnorm_scale, device) -> None:
+                 sigma_noise, unnorm_shift, unnorm_scale, noise_type, device) -> None:
         super().__init__(sigma_noise, unnorm_shift, unnorm_scale, device)
         self.gamma = gamma
         self.num_iters = num_iters
@@ -180,20 +180,37 @@ class DarkMatterImaging(BaseOperator):
         self.coords = torch.tensor(np.load(coords)).float().to(device)
         self.do_proj = do_proj
         self.pad_mat = F.pad(torch.ones((120, 120)), (4,4,4,4), 'constant', 0).unsqueeze(0).to(device)
+        self.noise_type = noise_type
 
         self.class_labels = torch.eye(self.eta_shape[0]).to(device) # class label matrix for sampling cubes
 
+    def __call__(self, 
+                inputs,
+                **kwargs):
+
+            target = inputs['target']
+            # calculate A(x)
+            out = self.forward(target, **kwargs)
+            # add noise
+            if self.noise_type == 'no_noise': 
+                return out
+            elif self.noise_type == 'gaussian': 
+                return out + self.sigma_noise * torch.randn_like(out)
+            else: 
+                raise ValueError
+
     def forward(self, x, **kwargs):
         x = self.unnormalize(x).reshape(self.eta_shape)
+        # x: [20, 128, 128]
         # Try padding 
         # x = x * self.pad_mat
         # pdb.set_trace()
         lightcone_out = lerp_planes_to_lightcone(x, self.r, self.dx, self.coords, self.device)
+        #lightcone_out: [20, 3, 64, 64]
         k = lightcone_out[:, 0]
         e1 = lightcone_out[:, 1]
         e2 = lightcone_out[:, 2]
-    
-        output = lightcone_out[1:, 1:]
+        output = lightcone_out[:, 1:]
 
         # if self.do_proj:
         #     output =  weighted_proj_map(output, self.pws)
@@ -219,7 +236,7 @@ class DarkMatterImaging(BaseOperator):
         # MSE Loss
         # pred = self.mean_subtract(pred.reshape(self.eta_shape))
         # observation = self.mean_subtract(observation.reshape(self.eta_shape))
-        return torch.mean(torch.square(self.forward(pred) - observation)) 
+        return torch.mean(torch.square((self.forward(pred) - observation).reshape(20, -1) * (self.r / self.r.max()).reshape(20, -1))) 
 
     def loss_m(self, measurements, observation): 
         # Chi-sq observation loss 
